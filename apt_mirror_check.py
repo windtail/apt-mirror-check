@@ -4,6 +4,7 @@ import click
 import os
 import hashlib
 import re
+import sys
 
 
 class Md5Attr(object):
@@ -168,6 +169,9 @@ def cli(base_dir, delete):
 
     if not has_bad:
         click.echo("No error found!")
+        sys.exit(0)
+    else:
+        sys.exit(1)
 
 
 if __name__ == "__main__":
