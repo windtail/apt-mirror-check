@@ -127,7 +127,7 @@ def find_base_path_in_config():
     try:
         with open("/etc/apt/mirror.list", "rt") as f:
             for line in f.readlines():
-                m = re.match(r"set\s+base_path\s+(\w+)", line)
+                m = re.match(r"set\s+base_path\s+([\w/-]+)", line)
                 if m is None:
                     continue
                 return m.group(1)
