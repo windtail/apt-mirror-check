@@ -25,8 +25,7 @@ def dist_md5attrs(dist_dir):
                 if not line.startswith(" "):
                     return md5attrs
                 sum, size, rname = line.split()
-                md5attrs[os.path.join(dist_dir, rname)] = Md5Attr(
-                    sum, int(size))
+                md5attrs[os.path.join(dist_dir, rname)] = Md5Attr(sum, int(size))
 
             elif line.startswith("MD5Sum:"):
                 list_start = True
@@ -64,8 +63,8 @@ def pool_md5attrs(dist_dir, pool_dir):
                 continue
             for pkgattr in pkg_attrs(os.path.join(root, filename)):
                 if pkgattr["Filename"].startswith("pool/"):
-                    md5attrs[os.path.join(pool_parent_dir, pkgattr["Filename"])] = Md5Attr(
-                        pkgattr["MD5sum"], int(pkgattr["Size"]))
+                    md5attrs[os.path.join(pool_parent_dir, pkgattr["Filename"])] = Md5Attr(pkgattr["MD5sum"],
+                        int(pkgattr["Size"]))
 
     return md5attrs
 
@@ -104,8 +103,7 @@ def bad_files_in_mirror(mirror_dir):
     walker = os.walk(dist_root)
     _, subdirs, _ = next(walker)
 
-    dist_dirs = [os.path.join(dist_root, subdir)
-                 for subdir in subdirs]
+    dist_dirs = [os.path.join(dist_root, subdir) for subdir in subdirs]
     pool_dir = os.path.join(mirror_dir, "pool")
 
     for dist_dir in dist_dirs:
@@ -144,13 +142,14 @@ def get_sites_dir(base_dir):
 
     sites_dir = os.path.join(base_dir, "mirror")  # NOTE: fixed as mirror
     if not os.path.isdir(sites_dir):
-        raise click.BadOptionUsage("--base-dir")
+        raise click.BadOptionUsage("--base-dir", "please specify correct base_path the same as /etc/apt/mirror.list")
 
     return sites_dir
 
 
 @click.command("Checking for corrupted files in apt-mirror files")
-@click.option("-b", "--base-dir", type=click.Path(exists=True, file_okay=False, readable=True, resolve_path=True), help="apt-mirror base_path")
+@click.option("-b", "--base-dir", type=click.Path(exists=True, file_okay=False, readable=True, resolve_path=True),
+              help="apt-mirror base_path")
 @click.option("--delete/--no-delete", default=False, help="delete corrupted files")
 def cli(base_dir, delete):
     sites_dir = get_sites_dir(base_dir)
