@@ -9,8 +9,9 @@ Install
 ::
 
    git clone https://github.com/windtail/apt-mirror-check.git
-   python setup.py install
+   python3 setup.py install
 
+** NOTE: python3 is required **
 
 Usage
 -----
