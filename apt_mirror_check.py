@@ -5,30 +5,55 @@ import os
 import hashlib
 import re
 import sys
+from pathlib import Path
 
 
-class Md5Attr(object):
-    def __init__(self, sum, size):
-        self.sum = sum
-        self.size = size
+class FileAttr(object):
+    def __init__(self, path):
+        self.path = path
+        self.md5sum = ""
+        self.sh256sum = ""
+        self.size = 0
 
 
-def dist_md5attrs(dist_dir):
-    """ Parse md5 attributes in Release file """
-    md5attrs = {}
+def parse_release_block_title_line(line):
+    if line.startswith("MD5Sum:"):
+        return True, "md5sum"
+    elif line.startswith("SHA256:"):
+        return True, "sh256sum"
+    else:
+        return False, ""
 
-    with open(os.path.join(dist_dir, "Release"), "rt") as f:
-        list_start = False
 
-        for line in f.readlines():
-            if list_start:
-                if not line.startswith(" "):
-                    return md5attrs
-                sum, size, rname = line.split()
-                md5attrs[os.path.join(dist_dir, rname)] = Md5Attr(sum, int(size))
+def dist_attrs(dist_dir):
+    """ Parse file attributes in Release file """
+    attrs = {}
 
-            elif line.startswith("MD5Sum:"):
-                list_start = True
+    for release in Path(dist_dir).rglob('Release'):
+        with open(release.as_posix(), "rt") as f:
+            in_block = False
+            attr_name = ""
+
+            for line in f.readlines():
+                if in_block:
+                    if not line.startswith(" "):
+                        in_block, attr_name = parse_release_block_title_line(line)
+                        continue
+                    checksum, size, rname = line.split()
+                    path = os.path.join(dist_dir, rname)
+
+                    attr = attrs.get(path)
+                    if attr is None:
+                        attr = FileAttr(path)
+                    attr.size = int(size)
+                    setattr(attr, attr_name, checksum)
+                    attrs[path] = attr
+
+                elif not line.startswith(" "):
+                    in_block, attr_name = parse_release_block_title_line(line)
+                    continue
+
+    return attrs
 
 
 def pkg_attrs(pkg_desc_path):
@@ -52,9 +77,9 @@ def pkg_attrs(pkg_desc_path):
                 attrs[last_key] = line[sep_index + 2:]  # skip : and a space
 
 
-def pool_md5attrs(dist_dir, pool_dir):
-    """ Parse md5 attributes in Packages file"""
-    md5attrs = {}
+def pool_attrs(dist_dir, pool_dir):
+    """ Parse attributes in Packages file"""
+    attrs = {}
     pool_parent_dir = os.path.dirname(pool_dir)
 
     for root, _, files in os.walk(dist_dir):
@@ -62,39 +87,56 @@ def pool_md5attrs(dist_dir, pool_dir):
             if filename != "Packages":
                 continue
             for pkgattr in pkg_attrs(os.path.join(root, filename)):
-                if pkgattr["Filename"].startswith("pool/"):
-                    md5attrs[os.path.join(pool_parent_dir, pkgattr["Filename"])] = Md5Attr(pkgattr["MD5sum"],
-                        int(pkgattr["Size"]))
+                name = pkgattr["Filename"]
+                if name.startswith("pool/"):
+                    path = os.path.join(pool_parent_dir, name)
 
-    return md5attrs
+                    attr = FileAttr(path)
+                    attr.size = int(pkgattr.get("Size", "0"))
+                    attr.md5sum = pkgattr.get("MD5sum", "")
+                    attr.sh256sum = pkgattr.get("SHA256", "")
+
+                    attrs[path] = attr
+    return attrs
 
 
-def is_md5_correct(filepath, md5attr):
+def is_checksum_correct(filepath, attr):
     s = os.stat(filepath)
-    if md5attr.size != s.st_size:
+    if attr.size != s.st_size:
+        print(filepath, "expected size: {}, but {}".format(attr.size, s.st_size))
         return False
 
-    with open(filepath, "rb") as f:
+    if len(attr.md5sum) != 0:
         m = hashlib.md5()
+        expected_checksum = attr.md5sum
+    elif len(attr.sh256sum) != 0:
+        m = hashlib.sha256()
+        expected_checksum = attr.sh256sum
+    else:
+        return True
+
+    with open(filepath, "rb") as f:
         while True:
             data = f.read(1024 * 1024)
             if not data:
                 break
 
             m.update(data)
-        sum = m.hexdigest()
-        if sum != md5attr.sum:
-            return False
+        checksum = m.hexdigest()
+
+    if checksum != expected_checksum:
+        print(filepath, "expected checksum: {}, but {}".format(expected_checksum, checksum))
+        return False
 
     return True
 
 
-def bad_files_in_dir(dirpath, md5attrs):
+def bad_files_in_dir(dirpath, attrs):
     for root, _, files in os.walk(dirpath):
         for filename in files:
             filepath = os.path.join(root, filename)
-            if filepath in md5attrs:
-                if not is_md5_correct(filepath, md5attrs[filepath]):
+            if filepath in attrs:
+                if not is_checksum_correct(filepath, attrs[filepath]):
                     yield filepath
 
 
@@ -108,8 +150,8 @@ def bad_files_in_mirror(mirror_dir):
 
     for dist_dir in dist_dirs:
         click.echo("checking %s ..." % dist_dir)
-        yield from bad_files_in_dir(dist_dir, dist_md5attrs(dist_dir))
-        yield from bad_files_in_dir(pool_dir, pool_md5attrs(dist_dir, pool_dir))
+        yield from bad_files_in_dir(dist_dir, dist_attrs(dist_dir))
+        yield from bad_files_in_dir(pool_dir, pool_attrs(dist_dir, pool_dir))
 
 
 def all_mirrors(sites_dir):

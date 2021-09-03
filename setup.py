@@ -6,7 +6,7 @@ from setuptools import setup
 
 setup(
     name="apt_mirror_check",
-    version="1.0.1",
+    version="1.0.2",
     description="Check corrupted files downloaded by apt-mirror",
     license="MIT",
     author="Luo Jiejun",
