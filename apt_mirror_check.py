@@ -61,6 +61,7 @@ def pkg_attrs(pkg_desc_path):
         attrs = {}
         last_key = None
         for line in f.readlines():
+            line = line.rstrip('\n')
             if len(line.strip()) == 0:
                 yield attrs
                 attrs = {}
