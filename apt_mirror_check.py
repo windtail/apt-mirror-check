@@ -144,7 +144,10 @@ def bad_files_in_dir(dirpath, attrs):
 def bad_files_in_mirror(mirror_dir):
     dist_root = os.path.join(mirror_dir, "dists")
     walker = os.walk(dist_root)
-    _, subdirs, _ = next(walker)
+    try:
+        _, subdirs, _ = next(walker)
+    except StopIteration:
+        subdirs = list()
 
     dist_dirs = [os.path.join(dist_root, subdir) for subdir in subdirs]
     pool_dir = os.path.join(mirror_dir, "pool")
